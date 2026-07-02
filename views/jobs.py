@@ -55,7 +55,7 @@ def _formulier(job: dict | None = None):
                               index=h.JOB_STATUSSEN.index(job.get("status", "Gepland")))
         veiligheid = st.text_area("Veiligheidsinstructies", job.get("veiligheidsinstructies") or "")
         werkverslag = st.text_area("Werkverslag", job.get("werkverslag") or "")
-        if st.form_submit_button("💾 Opslaan", type="primary"):
+        if st.form_submit_button("Opslaan", type="primary"):
             data = dict(deal_id=deal_id or None, site_id=site_id or None,
                         datum=datum.isoformat(), team=team, water=water, materiaal=materiaal,
                         robot=int(robot), hoogtewerker=int(hoogtewerker),
@@ -76,9 +76,9 @@ def _formulier(job: dict | None = None):
 
 
 def toon():
-    st.title("🛠️ Uitvoering / Jobs")
+    st.title("Uitvoering / Jobs")
 
-    with st.expander("➕ Nieuwe job (vanuit gewonnen deal)"):
+    with st.expander("+ Nieuwe job (vanuit gewonnen deal)"):
         _formulier()
 
     df = db.query_df("""
@@ -104,7 +104,7 @@ def toon():
     job_id = st.selectbox("Kies job", keuzes.keys(), format_func=keuzes.get)
     _formulier(db.haal_rij("jobs", job_id))
     bestanden_blok("job", job_id, ("Foto voor", "Foto na", "Document"))
-    if st.button("🗑️ Verwijder job"):
+    if st.button("Verwijder job"):
         db.verwijder("jobs", job_id)
         st.warning("Job verwijderd.")
         st.rerun()

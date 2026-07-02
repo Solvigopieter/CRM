@@ -7,7 +7,7 @@ import helpers as h
 
 
 def toon():
-    st.title("🤝 Partners")
+    st.title("Partners")
     st.caption("Installateurs, O&M-bedrijven en andere tussenpersonen. "
                "Een partner is nooit automatisch de eindklant.")
 
@@ -51,7 +51,7 @@ def toon():
     h.stat_tegel(c4, int(partner["open_deals"]), "Open deals")
 
     if partner["notities"]:
-        st.info(f"📝 Afspraken: {partner['notities']}")
+        st.info(f"Afspraken: {partner['notities']}")
 
     st.subheader("Contactpersonen")
     st.dataframe(db.query_df(
@@ -70,7 +70,7 @@ def toon():
         use_container_width=True, hide_index=True)
 
     # snelle lead-conversie: partner geeft eindklant + site door → in één keer aanmaken
-    st.subheader("⚡ Lead van partner omzetten naar eindklant + site + deal")
+    st.subheader("Lead van partner omzetten naar eindklant + site + deal")
     st.caption("Bijv.: de installateur zegt «neem contact op met die persoon». "
                "Vul hieronder in wie de eindklant is en welke site gereinigd moet worden.")
     with st.form("lead_conversie"):
@@ -85,7 +85,7 @@ def toon():
         panelen = c6.number_input("Aantal panelen (schatting)", min_value=0, value=0)
         waarde = c7.number_input("Geschatte dealwaarde (€)", min_value=0.0, value=0.0, step=100.0)
         omschrijving = st.text_input("Omschrijving deal", "Reiniging zonnepanelen")
-        if st.form_submit_button("⚡ Lead aanmaken", type="primary"):
+        if st.form_submit_button("Lead aanmaken", type="primary"):
             if not klantnaam.strip() or not sitenaam.strip():
                 st.error("Naam eindklant en naam site zijn verplicht.")
             else:

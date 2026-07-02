@@ -37,7 +37,7 @@ def _formulier(bezoek: dict | None = None):
         graad = c11.text_input("Vervuilingsgraad", bezoek.get("vervuilingsgraad") or "")
         conclusie = st.text_area("Interne conclusie", bezoek.get("conclusie") or "")
         advies = st.text_area("Advies voor klant", bezoek.get("advies") or "")
-        if st.form_submit_button("💾 Opslaan", type="primary"):
+        if st.form_submit_button("Opslaan", type="primary"):
             data = dict(deal_id=deal_id or None, site_id=site_id or None, datum=datum.isoformat(),
                         aanwezigen=aanwezigen, technische_opmerkingen=technisch,
                         bereikbaarheid=bereikbaarheid, wateraansluiting=water,
@@ -64,7 +64,7 @@ def _verslag(bezoek: dict):
         deal = db.haal_rij("deals", bezoek["deal_id"])
         dealtitel = deal["titel"] if deal else ""
     st.markdown(f"""
-### 📋 Verslag plaatsbezoek — {bezoek.get('datum', '')}
+### Verslag plaatsbezoek — {bezoek.get('datum', '')}
 **Deal:** {dealtitel or '—'} · **Site:** {sitenaam or '—'}
 
 | Onderdeel | Vaststelling |
@@ -88,9 +88,9 @@ def _verslag(bezoek: dict):
 
 
 def toon():
-    st.title("📋 Plaatsbezoeken")
+    st.title("Plaatsbezoeken")
 
-    with st.expander("➕ Nieuw plaatsbezoek"):
+    with st.expander("+ Nieuw plaatsbezoek"):
         _formulier()
 
     df = db.query_df("""
@@ -110,12 +110,12 @@ def toon():
     bezoek_id = st.selectbox("Open plaatsbezoek", keuzes.keys(), format_func=keuzes.get)
     bezoek = db.haal_rij("plaatsbezoeken", bezoek_id)
 
-    tab_verslag, tab_bewerken, tab_fotos = st.tabs(["📄 Verslag", "✏️ Bewerken", "📷 Foto's"])
+    tab_verslag, tab_bewerken, tab_fotos = st.tabs(["Verslag", "Bewerken", "Foto's"])
     with tab_verslag:
         _verslag(bezoek)
     with tab_bewerken:
         _formulier(bezoek)
-        if st.button("🗑️ Verwijder plaatsbezoek"):
+        if st.button("Verwijder plaatsbezoek"):
             db.verwijder("plaatsbezoeken", bezoek_id)
             st.warning("Plaatsbezoek verwijderd.")
             st.rerun()

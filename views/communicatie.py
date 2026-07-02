@@ -7,9 +7,9 @@ import helpers as h
 
 
 def toon():
-    st.title("💬 Communicatielog")
+    st.title("Communicatielog")
 
-    with st.expander("➕ Nieuwe notitie", expanded=False):
+    with st.expander("+ Nieuwe notitie", expanded=False):
         organisaties = db.organisatie_opties()
         partners = db.organisatie_opties(alleen_partners=True)
         deals = db.deal_opties()
@@ -28,7 +28,7 @@ def toon():
             site_id = c7.selectbox("Site", sitelijst.keys(), format_func=sitelijst.get)
             samenvatting = st.text_area("Korte samenvatting *")
             volgende_stap = st.text_input("Volgende stap")
-            if st.form_submit_button("💾 Opslaan", type="primary"):
+            if st.form_submit_button("Opslaan", type="primary"):
                 if not samenvatting.strip():
                     st.error("Samenvatting is verplicht.")
                 else:
@@ -55,7 +55,7 @@ def toon():
 
     f1, f2 = st.columns(2)
     f_type = f1.multiselect("Type", h.COMM_TYPES)
-    zoek = f2.text_input("🔍 Zoek in samenvattingen")
+    zoek = f2.text_input("Zoek in samenvattingen")
     if f_type:
         df = df[df["Type"].isin(f_type)]
     if zoek:
@@ -67,7 +67,7 @@ def toon():
         keuzes = {int(r["id"]): f"{r['Datum']} · {r['Type']} · {str(r['Samenvatting'])[:50]}"
                   for _, r in df.iterrows()}
         comm_id = st.selectbox("Notitie verwijderen", keuzes.keys(), format_func=keuzes.get)
-        if st.button("🗑️ Verwijder notitie"):
+        if st.button("Verwijder notitie"):
             db.verwijder("communicatie", comm_id)
             st.warning("Notitie verwijderd.")
             st.rerun()

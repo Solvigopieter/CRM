@@ -6,7 +6,7 @@ import helpers as h
 
 
 def toon():
-    st.title("📊 Dashboard")
+    st.title("Dashboard")
 
     open_deals = db.query_df(
         "SELECT COUNT(*) n, COALESCE(SUM(waarde),0) w, COALESCE(SUM(waarde*kans/100.0),0) v "
@@ -23,7 +23,7 @@ def toon():
     h.stat_tegel(k2, h.euro(open_deals["w"][0]), "Pipelinewaarde")
     h.stat_tegel(k3, h.euro(open_deals["v"][0]), "Verwachte omzet (gewogen)")
     h.stat_tegel(k4, acties_vandaag, "Acties vandaag")
-    h.stat_tegel(k5, f"🔴 {acties_telaat}" if acties_telaat else "🟢 0", "Achterstallige acties")
+    h.stat_tegel(k5, int(acties_telaat), "Achterstallige acties", alert=int(acties_telaat) > 0)
     h.stat_tegel(k6, bezoeken, "Plaatsbezoeken gepland")
 
     st.write("")
@@ -63,7 +63,7 @@ def toon():
         h.stat_tegel(c2, goedgekeurd, "Goedgekeurd")
         h.stat_tegel(c3, conversie, "Conversie")
 
-    st.subheader("🏆 Top 10 grootste open opportuniteiten")
+    st.subheader("Top 10 grootste open opportuniteiten")
     top = db.query_df("""
         SELECT d.titel AS Deal, o.naam AS Klant, COALESCE(p.naam,'') AS Partner,
                d.stadium AS Stadium, d.waarde AS Waarde, d.kans AS 'Kans %', d.deadline AS Deadline

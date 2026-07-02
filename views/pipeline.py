@@ -50,7 +50,7 @@ def _deal_formulier(deal: dict | None = None):
                                           index=h.VERANTWOORDELIJKEN.index(deal.get("verantwoordelijke"))
                                           if deal.get("verantwoordelijke") in h.VERANTWOORDELIJKEN else 0)
 
-        opslaan = st.form_submit_button("💾 Opslaan", type="primary")
+        opslaan = st.form_submit_button("Opslaan", type="primary")
         if opslaan:
             if not titel.strip():
                 st.error("Titel is verplicht.")
@@ -80,32 +80,38 @@ def _deal_formulier(deal: dict | None = None):
 
 
 def _kaart(rij):
-    kleur = h.STADIUM_KLEUR.get(rij["stadium"], "#2f6fb2")
+    kleur = h.STADIUM_KLEUR.get(rij["stadium"], "#2338B0")
     deadline_html = ""
     if rij["deadline"]:
-        klasse = "telaat" if h.te_laat(rij["deadline"]) else ""
-        deadline_html = f'<div class="{klasse}">📅 {rij["deadline"]}</div>'
-    partner_html = f'<div>🤝 {rij["partner"]}</div>' if rij["partner"] else ""
-    site_html = f'<div>☀️ {rij["site"]}</div>' if rij["site"] else ""
-    actie_html = f'<div>👉 {rij["volgende_actie"]}</div>' if rij["volgende_actie"] else "<div>⚠️ geen open actie</div>"
+        klasse = "telaat" if h.te_laat(rij["deadline"]) else "kaart-meta"
+        deadline_html = f'<div class="{klasse}">Deadline: {rij["deadline"]}</div>'
+    regels = [f'<div class="kaart-meta">{rij["klant"] or "—"}</div>']
+    if rij["partner"]:
+        regels.append(f'<div class="kaart-meta">via {rij["partner"]}</div>')
+    if rij["site"]:
+        regels.append(f'<div class="kaart-meta">{rij["site"]}</div>')
+    actie_html = (f'<div class="kaart-meta">Volgende: {rij["volgende_actie"]}</div>'
+                  if rij["volgende_actie"]
+                  else '<div class="telaat">Geen open actie</div>')
     st.markdown(
         f'<div class="kanban-kaart" style="--kaartkleur:{kleur}">'
-        f'<b>{rij["titel"]}</b><br>🏢 {rij["klant"] or "—"}'
-        f'{partner_html}{site_html}'
-        f'<div>💶 {h.euro(rij["waarde"])} · {h.prioriteit_badge(rij["prioriteit"])}</div>'
+        f'<b>{rij["titel"]}</b>'
+        f'{"".join(regels)}'
+        f'<div><span class="kaart-waarde">{h.euro(rij["waarde"])}</span> '
+        f'&nbsp;{h.prioriteit_badge(rij["prioriteit"])}</div>'
         f'{actie_html}{deadline_html}</div>',
         unsafe_allow_html=True,
     )
 
 
 def toon():
-    st.title("🧭 Pipeline")
+    st.title("Pipeline")
 
     boven1, boven2 = st.columns([3, 1])
-    zoek = boven1.text_input("🔍 Zoek op deal, klant, partner of site", "")
+    zoek = boven1.text_input("Zoek op deal, klant, partner of site", "")
     with boven2:
         st.write("")
-        nieuwe_lead = st.button("➕ Nieuwe lead", type="primary", use_container_width=True)
+        nieuwe_lead = st.button("+ Nieuwe lead", type="primary", use_container_width=True)
     if nieuwe_lead:
         st.session_state["toon_nieuwe_deal"] = True
     if st.session_state.get("toon_nieuwe_deal"):
@@ -116,7 +122,7 @@ def toon():
                 st.rerun()
 
     # filters
-    with st.expander("🔧 Filters"):
+    with st.expander("Filters"):
         f1, f2, f3, f4 = st.columns(4)
         partners = db.organisatie_opties(alleen_partners=True)
         f_stadia = f1.multiselect("Stadium", h.STADIUM_NAMEN)
@@ -158,7 +164,7 @@ def toon():
     if f_minwaarde:
         df = df[df["waarde"].fillna(0) >= f_minwaarde]
 
-    tab_kanban, tab_lijst, tab_beheer = st.tabs(["🗂️ Kanban", "📄 Lijst & export", "✏️ Deal bewerken"])
+    tab_kanban, tab_lijst, tab_beheer = st.tabs(["Kanban", "Lijst & export", "Deal bewerken"])
 
     with tab_kanban:
         toon_stadia = f_stadia or [s for s in h.STADIUM_NAMEN if s not in ("Afgerond", "Verloren")]
@@ -168,11 +174,11 @@ def toon():
             kolommen = st.columns(len(rij_stadia))
             for kolom, stadium in zip(kolommen, rij_stadia):
                 sub = df[df["stadium"] == stadium]
-                kleur = h.STADIUM_KLEUR.get(stadium, "#2f6fb2")
+                kleur = h.STADIUM_KLEUR.get(stadium, "#2338B0")
                 with kolom:
                     st.markdown(
                         f'<div class="kolomkop" style="--kaartkleur:{kleur}">'
-                        f'{stadium}<br>{len(sub)} · {h.euro(sub["waarde"].sum())}</div>',
+                        f'{stadium}<br><span class="kolom-som">{len(sub)} · {h.euro(sub["waarde"].sum())}</span></div>',
                         unsafe_allow_html=True)
                     for _, r in sub.iterrows():
                         _kaart(r)
@@ -198,7 +204,7 @@ def toon():
                                          index=h.STADIUM_NAMEN.index(deal["stadium"]))
             with s2:
                 st.write("")
-                if st.button("➡️ Verplaats", use_container_width=True) and nieuw_stadium != deal["stadium"]:
+                if st.button("Verplaats", use_container_width=True) and nieuw_stadium != deal["stadium"]:
                     actie = h.wijzig_stadium(deal_id, nieuw_stadium)
                     st.success(f"Deal verplaatst naar «{nieuw_stadium}»."
                                + (f" Volgende actie: {actie}" if actie else ""))
@@ -206,7 +212,7 @@ def toon():
 
             _deal_formulier(deal)
 
-            if st.button("🗑️ Verwijder deze deal"):
+            if st.button("Verwijder deze deal"):
                 db.verwijder("deals", deal_id)
                 st.warning("Deal verwijderd.")
                 st.rerun()

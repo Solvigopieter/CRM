@@ -23,7 +23,7 @@ def _formulier(org: dict | None = None):
         adres = c7.text_input("Adres", org.get("adres") or "")
         gemeente = c8.text_input("Gemeente", org.get("gemeente") or "")
         notities = st.text_area("Notities", org.get("notities") or "")
-        if st.form_submit_button("💾 Opslaan", type="primary"):
+        if st.form_submit_button("Opslaan", type="primary"):
             if not naam.strip():
                 st.error("Naam is verplicht.")
                 return
@@ -40,15 +40,15 @@ def _formulier(org: dict | None = None):
 
 def _klantenfiche(org_id: int):
     org = db.haal_rij("organisaties", org_id)
-    st.markdown(f"## 🏢 {org['naam']}")
-    terugkerend = " · 🔁 **Actieve terugkerende klant**" if org["relatietype"] in (
+    st.markdown(f"## {org['naam']}")
+    terugkerend = " · **Actieve terugkerende klant**" if org["relatietype"] in (
         "Terugkerende klant", "Strategische partner") else ""
     st.markdown(
         f"**{org['type']}** · status **{org['status']}** · relatietype **{org['relatietype']}**{terugkerend}")
     c1, c2, c3 = st.columns(3)
-    c1.write(f"📍 {org['adres'] or '—'}, {org['gemeente'] or ''}")
-    c2.write(f"🧾 BTW: {org['btw'] or '—'}")
-    c3.write(f"🌐 {org['website'] or '—'}")
+    c1.write(f"Adres: {org['adres'] or '—'}, {org['gemeente'] or ''}")
+    c2.write(f"BTW: {org['btw'] or '—'}")
+    c3.write(f"Web: {org['website'] or '—'}")
     if org["notities"]:
         st.info(org["notities"])
 
@@ -120,23 +120,23 @@ def _klantenfiche(org_id: int):
 
     with tabs[8]:
         _formulier(org)
-        if st.button("🗑️ Verwijder organisatie", key=f"del_org_{org_id}"):
+        if st.button("Verwijder organisatie", key=f"del_org_{org_id}"):
             db.verwijder("organisaties", org_id)
             st.warning("Organisatie verwijderd.")
             st.rerun()
 
 
 def toon():
-    st.title("🏢 Organisaties & klantenfiche")
+    st.title("Organisaties & klantenfiche")
 
-    with st.expander("➕ Nieuwe organisatie"):
+    with st.expander("+ Nieuwe organisatie"):
         _formulier()
 
     df = db.query_df("""
         SELECT id, naam AS Naam, type AS Type, gemeente AS Gemeente, sector AS Sector,
                status AS Status, relatietype AS Relatietype
         FROM organisaties ORDER BY naam""")
-    zoek = st.text_input("🔍 Zoek organisatie")
+    zoek = st.text_input("Zoek organisatie")
     if zoek:
         df = df[df["Naam"].str.lower().str.contains(zoek.lower())]
     st.dataframe(df.drop(columns=["id"]), use_container_width=True, hide_index=True)

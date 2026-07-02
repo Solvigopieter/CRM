@@ -7,10 +7,10 @@ import helpers as h
 
 
 def toon():
-    st.title("✅ Actieblad")
+    st.title("Actieblad")
 
     # snelle nieuwe taak
-    with st.expander("➕ Nieuwe actie", expanded=False):
+    with st.expander("+ Nieuwe actie", expanded=False):
         organisaties = db.organisatie_opties()
         partners = db.organisatie_opties(alleen_partners=True)
         sitelijst = db.site_opties()
@@ -27,8 +27,8 @@ def toon():
             c6, c7 = st.columns(2)
             site_id = c6.selectbox("Site", sitelijst.keys(), format_func=sitelijst.get)
             deal_id = c7.selectbox("Deal", deals.keys(), format_func=deals.get)
-            herinnering = st.checkbox("➕ Ook automatische herinnering «opvolgen binnen 7 dagen» aanmaken")
-            if st.form_submit_button("💾 Actie toevoegen", type="primary"):
+            herinnering = st.checkbox("+ Ook automatische herinnering «opvolgen binnen 7 dagen» aanmaken")
+            if st.form_submit_button("Actie toevoegen", type="primary"):
                 if not actie.strip():
                     st.error("Omschrijving is verplicht.")
                 else:
@@ -68,10 +68,10 @@ def toon():
 
     telaat_n = int(df["te_laat"].sum())
     if telaat_n:
-        st.error(f"🔴 {telaat_n} actie(s) zijn te laat.")
+        st.error(f"{telaat_n} actie(s) zijn te laat.")
 
     weergave = df.copy()
-    weergave["datum"] = weergave.apply(lambda r: f"🔴 {r['datum']}" if r["te_laat"] else r["datum"], axis=1)
+    weergave["datum"] = weergave.apply(lambda r: f"⚠ {r['datum']}" if r["te_laat"] else r["datum"], axis=1)
     weergave = weergave[["id", "datum", "prioriteit", "klant", "site", "partner",
                          "deal", "actie", "verantwoordelijke", "status"]]
     weergave.columns = ["ID", "Datum", "Prioriteit", "Klant", "Site", "Partner",
@@ -89,13 +89,13 @@ def toon():
     nieuwe_status = c1.selectbox("Nieuwe status", h.ACTIE_STATUSSEN)
     with c2:
         st.write("")
-        if st.button("💾 Status opslaan", use_container_width=True):
+        if st.button("Status opslaan", use_container_width=True):
             db.werk_bij("acties", actie_id, {"status": nieuwe_status})
             st.success("Status bijgewerkt.")
             st.rerun()
     with c3:
         st.write("")
-        if st.button("🗑️ Verwijder actie", use_container_width=True):
+        if st.button("Verwijder actie", use_container_width=True):
             db.verwijder("acties", actie_id)
             st.warning("Actie verwijderd.")
             st.rerun()

@@ -33,12 +33,12 @@ STADIUM_NAMEN = [s[0] for s in STADIA]
 VOLGENDE_ACTIE = {s[0]: (s[1], s[2]) for s in STADIA}
 
 STADIUM_KLEUR = {
-    "Nieuwe lead": "#2f6fb2", "Te kwalificeren": "#2f6fb2", "Info opgevraagd": "#2f6fb2",
-    "Plaatsbezoek gepland": "#8a6d1f", "Plaatsbezoek uitgevoerd": "#8a6d1f",
-    "Offerte maken": "#7a4fa3", "Offerte verstuurd": "#7a4fa3", "Opvolging offerte": "#7a4fa3",
-    "Goedgekeurd / in te plannen": "#1d7a4f", "In uitvoering": "#1d7a4f",
-    "Uitgevoerd": "#1d7a4f", "Facturatie": "#1d7a4f",
-    "Afgerond": "#5a6472", "Verloren": "#a33c3c",
+    "Nieuwe lead": "#8A94A6", "Te kwalificeren": "#8A94A6", "Info opgevraagd": "#8A94A6",
+    "Plaatsbezoek gepland": "#5B6B8C", "Plaatsbezoek uitgevoerd": "#5B6B8C",
+    "Offerte maken": "#2338B0", "Offerte verstuurd": "#2338B0", "Opvolging offerte": "#2338B0",
+    "Goedgekeurd / in te plannen": "#1E8E5A", "In uitvoering": "#1E8E5A",
+    "Uitgevoerd": "#1E8E5A", "Facturatie": "#1E8E5A",
+    "Afgerond": "#9CA3AF", "Verloren": "#B4443C",
 }
 
 VERVUILINGEN = ["Stof", "Vogelpoep", "Korstmos", "Landbouwstof", "Industrie", "Cementstof", "Onbekend"]
@@ -104,7 +104,7 @@ def excel_bytes(df: pd.DataFrame, bladnaam: str = "Export") -> bytes:
     return buffer.getvalue()
 
 
-def export_knop(df: pd.DataFrame, bestandsnaam: str, label: str = "⬇️ Exporteer naar Excel"):
+def export_knop(df: pd.DataFrame, bestandsnaam: str, label: str = "Exporteer naar Excel"):
     if df.empty:
         return
     st.download_button(
@@ -124,8 +124,13 @@ def euro(bedrag) -> str:
 
 
 def prioriteit_badge(p: str) -> str:
-    kleur = {"Hoog": "#a33c3c", "Normaal": "#2f6fb2", "Laag": "#5a6472"}.get(p, "#5a6472")
-    return f'<span style="background:{kleur};color:#fff;border-radius:10px;padding:1px 8px;font-size:0.72rem;">{p}</span>'
+    stijl = {
+        "Hoog": ("#FBE9E7", "#B4443C"),
+        "Normaal": ("#E8ECFB", "#2338B0"),
+        "Laag": ("#F1F3F5", "#6B7280"),
+    }.get(p, ("#F1F3F5", "#6B7280"))
+    return (f'<span style="background:{stijl[0]};color:{stijl[1]};border-radius:4px;'
+            f'padding:1px 7px;font-size:0.7rem;font-weight:600;">{p}</span>')
 
 
 def te_laat(datum_str: str) -> bool:
@@ -146,58 +151,121 @@ def sleutel_uit_opties(opties_dict: dict, huidige_id) -> int:
 
 CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Inter:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
-html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
-h1, h2, h3 { font-family: 'Sora', sans-serif !important; letter-spacing: -0.02em; }
+html, body, [class*="css"], .stMarkdown, p, span, label { font-family: 'Inter', sans-serif; }
+h1, h2, h3, h4 { font-family: 'Inter', sans-serif !important; letter-spacing: -0.01em;
+                 color: #16204E !important; font-weight: 700 !important; }
+h1 { font-size: 1.6rem !important; }
+h2 { font-size: 1.25rem !important; }
+h3 { font-size: 1.05rem !important; }
 
+/* App-achtergrond: wit met heel lichte grijstint */
+.stApp { background: #FAFBFC; }
+.block-container { padding-top: 2.2rem; }
+
+/* Zijbalk: wit, strak, blauwe accenten */
 section[data-testid="stSidebar"] {
-    background: linear-gradient(180deg, #0d2137 0%, #123a57 100%);
+    background: #FFFFFF;
+    border-right: 1px solid #E8EAEE;
 }
-section[data-testid="stSidebar"] * { color: #eaf2f8 !important; }
-section[data-testid="stSidebar"] .stRadio label:hover { opacity: 0.85; }
+section[data-testid="stSidebar"] * { color: #374151; }
+section[data-testid="stSidebar"] .stRadio label {
+    padding: 2px 0;
+    font-size: 0.92rem;
+}
+section[data-testid="stSidebar"] .stRadio label:hover { color: #2338B0; }
+section[data-testid="stSidebar"] hr { border-color: #E8EAEE; }
 
+/* Knoppen */
+.stButton > button, .stFormSubmitButton > button, .stDownloadButton > button {
+    border-radius: 6px;
+    font-weight: 600;
+    border: 1px solid #D8DCE3;
+}
+.stButton > button[kind="primary"], .stFormSubmitButton > button[kind="primary"] {
+    background: #2338B0;
+    border-color: #2338B0;
+}
+.stButton > button[kind="primary"]:hover, .stFormSubmitButton > button[kind="primary"]:hover {
+    background: #1B2C8E;
+    border-color: #1B2C8E;
+}
+
+/* Kanban-kaarten: wit, subtiele rand, dun kleuraccent links */
 div.kanban-kaart {
-    background: #ffffff;
-    border: 1px solid #dde5ec;
-    border-left: 4px solid var(--kaartkleur, #2f6fb2);
-    border-radius: 8px;
-    padding: 8px 10px;
+    background: #FFFFFF;
+    border: 1px solid #E8EAEE;
+    border-left: 3px solid var(--kaartkleur, #2338B0);
+    border-radius: 6px;
+    padding: 10px 12px;
     margin-bottom: 8px;
     font-size: 0.8rem;
-    line-height: 1.35;
-    box-shadow: 0 1px 2px rgba(13,33,55,0.06);
+    line-height: 1.5;
+    color: #4B5563;
+    box-shadow: 0 1px 2px rgba(22,32,78,0.04);
 }
-div.kanban-kaart b { font-size: 0.85rem; }
+div.kanban-kaart:hover { box-shadow: 0 2px 6px rgba(22,32,78,0.10); }
+div.kanban-kaart b { font-size: 0.85rem; color: #16204E; }
+div.kanban-kaart .kaart-waarde { color: #16204E; font-weight: 600; }
+div.kanban-kaart .kaart-meta { color: #6B7280; font-size: 0.75rem; }
+
+/* Kolomkoppen: licht, met kleuraccent als stip */
 div.kolomkop {
-    font-family: 'Sora', sans-serif;
-    font-size: 0.78rem;
-    font-weight: 600;
-    color: #fff;
-    background: var(--kaartkleur, #2f6fb2);
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #374151;
+    background: #F1F3F6;
+    border: 1px solid #E8EAEE;
+    border-top: 3px solid var(--kaartkleur, #2338B0);
     border-radius: 6px;
-    padding: 4px 8px;
+    padding: 6px 8px;
     margin-bottom: 8px;
     text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
 }
-div.telaat { color: #a33c3c; font-weight: 600; }
+div.kolomkop .kolom-som { color: #6B7280; font-weight: 500; text-transform: none; }
 
+div.telaat { color: #B4443C; font-weight: 600; }
+
+/* KPI-tegels */
 .stat-tegel {
-    background: #ffffff;
-    border: 1px solid #dde5ec;
-    border-radius: 10px;
+    background: #FFFFFF;
+    border: 1px solid #E8EAEE;
+    border-radius: 8px;
     padding: 14px 16px;
-    box-shadow: 0 1px 3px rgba(13,33,55,0.07);
+    box-shadow: 0 1px 2px rgba(22,32,78,0.04);
 }
-.stat-tegel .waarde { font-family:'Sora',sans-serif; font-size: 1.6rem; font-weight: 700; color: #0d2137; }
-.stat-tegel .label { font-size: 0.75rem; color: #5a6472; text-transform: uppercase; letter-spacing: 0.05em; }
+.stat-tegel .waarde { font-size: 1.5rem; font-weight: 700; color: #16204E; }
+.stat-tegel .label { font-size: 0.7rem; color: #8A94A6; text-transform: uppercase;
+                     letter-spacing: 0.06em; font-weight: 600; margin-top: 2px; }
+.stat-tegel .waarde.alert { color: #B4443C; }
+
+/* Tabellen strakker */
+[data-testid="stDataFrame"] { border: 1px solid #E8EAEE; border-radius: 8px; }
+
+/* Tabs in blauw */
+.stTabs [data-baseweb="tab-highlight"] { background-color: #2338B0; }
+.stTabs [aria-selected="true"] { color: #2338B0 !important; font-weight: 600; }
+
+/* Expanders */
+[data-testid="stExpander"] {
+    border: 1px solid #E8EAEE;
+    border-radius: 8px;
+    background: #FFFFFF;
+}
+
+/* Geel accent voor kleine details */
+.accent-geel { color: #C99E00; }
 </style>
 """
 
 
-def stat_tegel(kolom, waarde, label):
+def stat_tegel(kolom, waarde, label, alert: bool = False):
+    klasse = "waarde alert" if alert else "waarde"
     kolom.markdown(
-        f'<div class="stat-tegel"><div class="waarde">{waarde}</div>'
+        f'<div class="stat-tegel"><div class="{klasse}">{waarde}</div>'
         f'<div class="label">{label}</div></div>',
         unsafe_allow_html=True,
     )

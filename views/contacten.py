@@ -23,7 +23,7 @@ def _formulier(contact: dict | None = None):
         telefoon = c5.text_input("Telefoon", contact.get("telefoon") or "")
         linkedin = c6.text_input("LinkedIn", contact.get("linkedin") or "")
         notities = st.text_area("Notities / voorkeuren", contact.get("notities") or "")
-        if st.form_submit_button("💾 Opslaan", type="primary"):
+        if st.form_submit_button("Opslaan", type="primary"):
             if not naam.strip():
                 st.error("Naam is verplicht.")
                 return
@@ -39,9 +39,9 @@ def _formulier(contact: dict | None = None):
 
 
 def toon():
-    st.title("👤 Contactpersonen")
+    st.title("Contactpersonen")
 
-    with st.expander("➕ Nieuwe contactpersoon"):
+    with st.expander("+ Nieuwe contactpersoon"):
         _formulier()
 
     df = db.query_df("""
@@ -50,7 +50,7 @@ def toon():
                c.linkedin AS LinkedIn, c.notities AS Notities
         FROM contacten c LEFT JOIN organisaties o ON o.id = c.organisatie_id
         ORDER BY c.naam""")
-    zoek = st.text_input("🔍 Zoek contact")
+    zoek = st.text_input("Zoek contact")
     if zoek:
         z = zoek.lower()
         df = df[df.apply(lambda r: z in str(r["Naam"]).lower()
@@ -62,7 +62,7 @@ def toon():
         st.subheader("Bewerken of verwijderen")
         contact_id = st.selectbox("Kies contact", keuzes.keys(), format_func=keuzes.get)
         _formulier(db.haal_rij("contacten", contact_id))
-        if st.button("🗑️ Verwijder contactpersoon"):
+        if st.button("Verwijder contactpersoon"):
             db.verwijder("contacten", contact_id)
             st.warning("Contactpersoon verwijderd.")
             st.rerun()

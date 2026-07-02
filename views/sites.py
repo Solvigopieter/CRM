@@ -39,7 +39,7 @@ def _formulier(site: dict | None = None):
                                    if site.get("frequentie") in h.FREQUENTIES else 0)
         veiligheid = c12.text_input("Veiligheidsrisico's", site.get("veiligheid") or "")
         notities = st.text_area("Notities", site.get("notities") or "")
-        if st.form_submit_button("💾 Opslaan", type="primary"):
+        if st.form_submit_button("Opslaan", type="primary"):
             if not naam.strip():
                 st.error("Naam is verplicht.")
                 return
@@ -59,12 +59,12 @@ def _formulier(site: dict | None = None):
 
 def bestanden_blok(entiteit: str, entiteit_id: int, categorien=("Document", "Foto voor", "Foto na")):
     """Herbruikbaar upload- en weergaveblok voor foto's/documenten."""
-    st.markdown("**📎 Foto's & documenten**")
+    st.markdown("**Foto's & documenten**")
     c1, c2 = st.columns([2, 1])
     upload = c1.file_uploader("Bestand toevoegen", key=f"up_{entiteit}_{entiteit_id}",
                               accept_multiple_files=False)
     categorie = c2.selectbox("Categorie", categorien, key=f"cat_{entiteit}_{entiteit_id}")
-    if upload is not None and st.button("⬆️ Uploaden", key=f"btn_{entiteit}_{entiteit_id}"):
+    if upload is not None and st.button("Uploaden", key=f"btn_{entiteit}_{entiteit_id}"):
         doelmap = db.UPLOAD_MAP / entiteit / str(entiteit_id)
         doelmap.mkdir(parents=True, exist_ok=True)
         pad = doelmap / upload.name
@@ -82,15 +82,15 @@ def bestanden_blok(entiteit: str, entiteit_id: int, categorien=("Document", "Fot
         pad = Path(rij["pad"])
         if pad.exists() and pad.suffix.lower() in (".png", ".jpg", ".jpeg", ".webp"):
             c1.image(str(pad), width=260)
-        if c2.button("🗑️", key=f"delb_{rij['id']}"):
+        if c2.button("Verwijder", key=f"delb_{rij['id']}"):
             db.verwijder("bestanden", int(rij["id"]))
             st.rerun()
 
 
 def toon():
-    st.title("☀️ PV-sites")
+    st.title("PV-sites")
 
-    with st.expander("➕ Nieuwe PV-site"):
+    with st.expander("+ Nieuwe PV-site"):
         _formulier()
 
     df = db.query_df("""
@@ -103,7 +103,7 @@ def toon():
         LEFT JOIN organisaties o ON o.id = s.organisatie_id
         LEFT JOIN organisaties p ON p.id = s.partner_id
         ORDER BY s.naam""")
-    zoek = st.text_input("🔍 Zoek site")
+    zoek = st.text_input("Zoek site")
     if zoek:
         z = zoek.lower()
         df = df[df.apply(lambda r: z in str(r["Site"]).lower()
@@ -118,7 +118,7 @@ def toon():
         site_id = st.selectbox("Kies site", keuzes.keys(), format_func=keuzes.get)
         _formulier(db.haal_rij("sites", site_id))
         bestanden_blok("site", site_id)
-        if st.button("🗑️ Verwijder site"):
+        if st.button("Verwijder site"):
             db.verwijder("sites", site_id)
             st.warning("Site verwijderd.")
             st.rerun()
