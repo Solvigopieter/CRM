@@ -12,6 +12,7 @@ google_sheet_id = "..."
 from __future__ import annotations
 
 import sqlite3
+import time
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -288,6 +289,27 @@ def _sqlite_voer_uit(sql: str, params: tuple = ()) -> int:
 
 _GS_CLIENT = None
 _GS_SPREADSHEET = None
+_GS_WORKSHEETS: dict[str, Any] = {}
+_GS_RECORDS_CACHE: dict[str, list[dict]] | None = None
+_GS_RECORDS_CACHE_TS = 0.0
+_GS_CACHE_SECONDS = 30
+_GS_INITIALIZED = False
+
+
+def _invalidate_google_cache():
+    """Ververst de lokale cache na elke wijziging in Google Sheets."""
+    global _GS_RECORDS_CACHE, _GS_RECORDS_CACHE_TS
+    _GS_RECORDS_CACHE = None
+    _GS_RECORDS_CACHE_TS = 0.0
+
+
+def _worksheet_index() -> dict[str, Any]:
+    """Haalt de lijst met tabbladen maar één keer op om Google API-quota te sparen."""
+    global _GS_WORKSHEETS
+    if not _GS_WORKSHEETS:
+        ss = _spreadsheet()
+        _GS_WORKSHEETS = {ws.title: ws for ws in ss.worksheets()}
+    return _GS_WORKSHEETS
 
 
 def _google_credentials_dict() -> dict:
@@ -330,24 +352,27 @@ def _worksheet(tabel: str):
 
     ss = _spreadsheet()
     headers = TABEL_KOLOMMEN[tabel]
-    try:
-        ws = ss.worksheet(tabel)
-    except Exception:
-        ws = ss.add_worksheet(title=tabel, rows=1000, cols=max(20, len(headers)))
-        ws.update(values=[headers], range_name="A1")
-        return ws
+    werkbladen = _worksheet_index()
+    ws = werkbladen.get(tabel)
 
-    waarden = ws.get_all_values()
-    huidige_headers = waarden[0] if waarden else []
-    if huidige_headers[:len(headers)] != headers:
+    if ws is None:
+        # Alleen echt toevoegen als het tabblad ontbreekt. Vang dus niet elke Google API-fout op,
+        # want quota-fouten mogen niet leiden tot opnieuw toevoegen van bestaande tabbladen.
+        ws = ss.add_worksheet(title=tabel, rows=1000, cols=max(20, len(headers)))
+        werkbladen[tabel] = ws
         ws.update(values=[headers], range_name="A1")
+
     return ws
 
 
-def _sheet_records(tabel: str) -> list[dict]:
+def _sheet_records_direct(tabel: str) -> list[dict]:
     ws = _worksheet(tabel)
-    records = ws.get_all_records()
     headers = TABEL_KOLOMMEN[tabel]
+    try:
+        records = ws.get_all_records(expected_headers=headers)
+    except TypeError:
+        records = ws.get_all_records()
+
     opgeschoond: list[dict] = []
     for record in records:
         # Sla volledig lege rijen over.
@@ -355,6 +380,31 @@ def _sheet_records(tabel: str) -> list[dict]:
             continue
         opgeschoond.append({k: record.get(k, "") for k in headers})
     return opgeschoond
+
+
+def _google_all_records(force: bool = False) -> dict[str, list[dict]]:
+    """Lees alle tabellen in één tijdelijke cache.
+
+    Zonder cache leest elke dashboard-query alle tabbladen opnieuw. Dat veroorzaakt snel
+    Google Sheets fout 429: read quota exceeded.
+    """
+    global _GS_RECORDS_CACHE, _GS_RECORDS_CACHE_TS
+    nu = time.time()
+    if (
+        not force
+        and _GS_RECORDS_CACHE is not None
+        and (nu - _GS_RECORDS_CACHE_TS) < _GS_CACHE_SECONDS
+    ):
+        return _GS_RECORDS_CACHE
+
+    data = {tabel: _sheet_records_direct(tabel) for tabel in TABEL_KOLOMMEN}
+    _GS_RECORDS_CACHE = data
+    _GS_RECORDS_CACHE_TS = nu
+    return data
+
+
+def _sheet_records(tabel: str) -> list[dict]:
+    return list(_google_all_records().get(tabel, []))
 
 
 def _als_sheet_waarde(waarde: Any) -> Any:
@@ -390,16 +440,22 @@ def _volgend_id(tabel: str) -> int:
 
 def _google_init_db():
     # Maakt alle worksheets + headers aan als ze nog niet bestaan.
+    # Dit gebeurt maar één keer per Streamlit-proces om API-quota te sparen.
+    global _GS_INITIALIZED
+    if _GS_INITIALIZED:
+        return
     for tabel in TABEL_KOLOMMEN:
         _worksheet(tabel)
+    _GS_INITIALIZED = True
 
 
 def _google_temp_sqlite() -> sqlite3.Connection:
     con = sqlite3.connect(":memory:")
     con.row_factory = sqlite3.Row
     con.executescript(SCHEMA)
+    alle_records = _google_all_records()
     for tabel, kolommen in TABEL_KOLOMMEN.items():
-        records = _sheet_records(tabel)
+        records = alle_records.get(tabel, [])
         if not records:
             continue
         plekken = ", ".join("?" for _ in kolommen)
@@ -426,6 +482,7 @@ def _google_voeg_toe(tabel: str, data: dict) -> int:
     record = _met_standaarden(tabel, dict(data, id=rij_id))
     waarden = [_als_sheet_waarde(record.get(k, "")) for k in TABEL_KOLOMMEN[tabel]]
     ws.append_row(waarden, value_input_option="USER_ENTERED")
+    _invalidate_google_cache()
     return rij_id
 
 
@@ -469,6 +526,7 @@ def _google_werk_bij(tabel: str, rij_id: int, data: dict):
     rijwaarden = [_als_sheet_waarde(bestaand.get(k, "")) for k in headers]
     laatste_kolom = chr(ord("A") + len(headers) - 1) if len(headers) <= 26 else "ZZ"
     ws.update(values=[rijwaarden], range_name=f"A{doelrij}:{laatste_kolom}{doelrij}")
+    _invalidate_google_cache()
 
 
 def _google_verwijder(tabel: str, rij_id: int):
@@ -480,6 +538,7 @@ def _google_verwijder(tabel: str, rij_id: int):
         try:
             if int(rij[0]) == int(rij_id):
                 ws.delete_rows(idx)
+                _invalidate_google_cache()
                 return
         except (TypeError, ValueError, IndexError):
             continue
