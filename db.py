@@ -63,6 +63,7 @@ TABEL_KOLOMMEN: dict[str, list[str]] = {
         "id", "deal_id", "site_id", "nummer", "aantal_panelen", "oppervlakte",
         "prijs_per_paneel", "totaalprijs", "transport", "waterkost", "hoogtewerker_kost",
         "speciale_vervuiling", "coating", "opmerkingen", "status", "datum",
+        "pdf_bestandsnaam", "pdf_drive_id",
     ],
     "jobs": [
         "id", "deal_id", "site_id", "datum", "team", "materiaal", "water", "robot",
@@ -189,7 +190,9 @@ CREATE TABLE IF NOT EXISTS offertes (
     transport REAL DEFAULT 0, waterkost REAL DEFAULT 0, hoogtewerker_kost REAL DEFAULT 0,
     speciale_vervuiling TEXT, coating INTEGER DEFAULT 0, opmerkingen TEXT,
     status TEXT DEFAULT 'Concept',
-    datum TEXT DEFAULT (date('now'))
+    datum TEXT DEFAULT (date('now')),
+    pdf_bestandsnaam TEXT,
+    pdf_drive_id TEXT
 );
 
 CREATE TABLE IF NOT EXISTS jobs (
@@ -361,6 +364,16 @@ def _worksheet(tabel: str):
         ws = ss.add_worksheet(title=tabel, rows=1000, cols=max(20, len(headers)))
         werkbladen[tabel] = ws
         ws.update(values=[headers], range_name="A1")
+    else:
+        # Sync headers: voeg ontbrekende kolommen toe aan bestaande sheets.
+        try:
+            huidige_headers = ws.row_values(1)
+            ontbrekend = [h for h in headers if h not in huidige_headers]
+            if ontbrekend:
+                nieuwe_headers = huidige_headers + ontbrekend
+                ws.update(values=[nieuwe_headers], range_name="A1")
+        except Exception:
+            pass  # Bij quota-fout niet blokkeren.
 
     return ws
 
