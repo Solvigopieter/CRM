@@ -94,42 +94,59 @@ def _pdf_blok(offerte_id: int):
     st.markdown("---")
     st.markdown("#### 📄 Offerte-PDF")
 
-    heeft_pdf = bool(off.get("pdf_drive_id"))
+    heeft_pdf = bool(off.get("pdf_bestandsnaam"))
 
     if heeft_pdf:
-        link = drive.drive_link(off["pdf_drive_id"])
-        st.success(f"📎 **{off.get('pdf_bestandsnaam', 'offerte.pdf')}** — gekoppeld aan deze offerte")
+        st.success(f"📎 **{off['pdf_bestandsnaam']}** — gekoppeld aan deze offerte")
         c1, c2 = st.columns(2)
-        c1.link_button("📥 Openen in Google Drive", link, use_container_width=True)
-        if c2.button("🗑️ PDF verwijderen", key=f"delpdf_{offerte_id}", use_container_width=True):
-            drive.verwijder_bestand(off["pdf_drive_id"])
-            db.werk_bij("offertes", offerte_id, {"pdf_bestandsnaam": "", "pdf_drive_id": ""})
-            st.success("PDF verwijderd.")
-            st.rerun()
 
+        # Downloadknop
+        with c1:
+            if st.button("📥 PDF downloaden", key=f"dlpdf_{offerte_id}", use_container_width=True):
+                with st.spinner("PDF ophalen..."):
+                    resultaat = drive.haal_pdf_op(int(offerte_id))
+                    if resultaat:
+                        naam, data = resultaat
+                        st.download_button(
+                            "💾 Klik om te downloaden",
+                            data=data,
+                            file_name=naam,
+                            mime="application/pdf",
+                            key=f"dlbtn_{offerte_id}",
+                        )
+                    else:
+                        st.error("PDF niet gevonden in de database.")
+
+        # Verwijderknop
+        with c2:
+            if st.button("🗑️ PDF verwijderen", key=f"delpdf_{offerte_id}", use_container_width=True):
+                drive.verwijder_bestand(int(offerte_id))
+                db.werk_bij("offertes", offerte_id, {"pdf_bestandsnaam": "", "pdf_drive_id": ""})
+                st.success("PDF verwijderd.")
+                st.rerun()
+
+    # Upload
     upload = st.file_uploader(
         "PDF uploaden" if not heeft_pdf else "Andere PDF uploaden (vervangt de huidige)",
         type=["pdf"],
         key=f"pdfup_{offerte_id}",
     )
     if upload is not None:
-        if st.button("⬆️ PDF opslaan naar Google Drive", key=f"pdfbtn_{offerte_id}",
-                     type="primary", use_container_width=True):
-            with st.spinner("Bezig met uploaden naar Google Drive..."):
-                # Bestandsnaam: offertenummer + originele naam
+        # Bestandsgrootte check (max ~5 MB)
+        grootte_mb = len(upload.getbuffer()) / (1024 * 1024)
+        if grootte_mb > 5:
+            st.error(f"Bestand is {grootte_mb:.1f} MB — maximaal 5 MB toegestaan.")
+        elif st.button("⬆️ PDF opslaan", key=f"pdfbtn_{offerte_id}",
+                       type="primary", use_container_width=True):
+            with st.spinner("Bezig met opslaan..."):
                 prefix = off.get("nummer") or f"OFF-{offerte_id}"
                 bestandsnaam = f"{prefix}_{upload.name}"
-
-                # Verwijder oude PDF als die er was
-                if heeft_pdf:
-                    drive.verwijder_bestand(off["pdf_drive_id"])
-
-                file_id, link = drive.upload_pdf(bestandsnaam, upload.getbuffer().tobytes())
+                drive.upload_pdf(bestandsnaam, upload.getbuffer().tobytes(), int(offerte_id))
                 db.werk_bij("offertes", offerte_id, {
                     "pdf_bestandsnaam": bestandsnaam,
-                    "pdf_drive_id": file_id,
+                    "pdf_drive_id": str(offerte_id),  # referentie naar pdf_bestanden sheet
                 })
-                st.success(f"PDF **{bestandsnaam}** opgeslagen op Google Drive.")
+                st.success(f"PDF **{bestandsnaam}** opgeslagen.")
                 st.rerun()
 
 
@@ -147,7 +164,7 @@ def toon():
                o.speciale_vervuiling AS 'Speciale vervuiling',
                CASE o.coating WHEN 1 THEN 'Ja' ELSE 'Nee' END AS Coating,
                o.status AS Status,
-               CASE WHEN o.pdf_drive_id IS NOT NULL AND o.pdf_drive_id != '' THEN '📄 Ja' ELSE '—' END AS PDF
+               CASE WHEN o.pdf_bestandsnaam IS NOT NULL AND o.pdf_bestandsnaam != '' THEN '📄 Ja' ELSE '—' END AS PDF
         FROM offertes o
         LEFT JOIN deals d ON d.id = o.deal_id
         LEFT JOIN sites s ON s.id = o.site_id
@@ -165,18 +182,14 @@ def toon():
     offerte_id = st.selectbox("Kies offerte", keuzes.keys(), format_func=keuzes.get)
     _formulier(db.haal_rij("offertes", offerte_id))
 
-    # PDF-upload/download blok
+    # PDF-blok
     if DRIVE_OK:
         _pdf_blok(offerte_id)
-    else:
-        st.info("📄 PDF-upload is beschikbaar als `google-api-python-client` geïnstalleerd is. "
-                "Voeg het toe aan requirements.txt en herstart de app.")
 
     if st.button("🗑️ Verwijder offerte"):
-        # Verwijder ook de PDF van Drive als die er is
         off = db.haal_rij("offertes", offerte_id)
-        if off and off.get("pdf_drive_id") and DRIVE_OK:
-            drive.verwijder_bestand(off["pdf_drive_id"])
+        if off and off.get("pdf_bestandsnaam") and DRIVE_OK:
+            drive.verwijder_bestand(int(offerte_id))
         db.verwijder("offertes", offerte_id)
         st.warning("Offerte verwijderd.")
         st.rerun()

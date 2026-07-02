@@ -1,125 +1,113 @@
 """
-Solvigo CRM – Google Drive helper
+Solvigo CRM – PDF-opslag via Google Sheets
 
-Upload bestanden (PDF's) naar Google Drive via het service-account.
-Bestanden komen in de map  Solvigo CRM > Offertes  op de Drive van het
-service-account. Ze worden publiek leesbaar gemaakt zodat je ze kan openen
-via een link.
+Slaat offerte-PDF's op als base64-data in een apart tabblad ('pdf_bestanden')
+in dezelfde Google Sheet. Geen extra API's of Drive-rechten nodig.
+
+Limiet: ±5 MB per PDF (ruim voldoende voor offertes).
 """
 from __future__ import annotations
 
+import base64
 import io
-from typing import Any
 
 import streamlit as st
 
-try:
-    from googleapiclient.discovery import build
-    from googleapiclient.http import MediaIoBaseUpload
-    from google.oauth2.service_account import Credentials
-
-    DRIVE_BESCHIKBAAR = True
-except ImportError:
-    DRIVE_BESCHIKBAAR = False
-
-SCOPES = [
-    "https://www.googleapis.com/auth/drive.file",
-    "https://www.googleapis.com/auth/drive",
-]
-
-_DRIVE_SERVICE = None
+DRIVE_BESCHIKBAAR = True  # altijd beschikbaar, want gebruikt alleen Sheets
 
 
-def _credentials_dict() -> dict:
-    """Lees de service-account-gegevens uit Streamlit secrets."""
-    sa = st.secrets.get("gcp_service_account")
-    if sa is None:
-        raise RuntimeError("gcp_service_account ontbreekt in Streamlit secrets.")
-    return dict(sa)
+def _pdf_sheet():
+    """Geeft het worksheet 'pdf_bestanden' terug, maakt het aan als het niet bestaat."""
+    import db
+    ss = db._spreadsheet()
+    try:
+        ws = ss.worksheet("pdf_bestanden")
+    except Exception:
+        ws = ss.add_worksheet(title="pdf_bestanden", rows=500, cols=4)
+        ws.update(values=[["offerte_id", "bestandsnaam", "chunk_nr", "data"]], range_name="A1")
+    return ws
 
 
-@st.cache_resource
-def _drive_service():
-    if not DRIVE_BESCHIKBAAR:
-        raise RuntimeError(
-            "google-api-python-client is niet geïnstalleerd. "
-            "Voer uit: pip install google-api-python-client"
-        )
-    creds = Credentials.from_service_account_info(_credentials_dict(), scopes=SCOPES)
-    return build("drive", "v3", credentials=creds, cache_discovery=False)
-
-
-def _zoek_of_maak_map(naam: str, parent_id: str | None = None) -> str:
-    """Zoek een map op naam (onder parent), of maak ze aan. Geeft folder-id terug."""
-    service = _drive_service()
-    query = f"name = '{naam}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false"
-    if parent_id:
-        query += f" and '{parent_id}' in parents"
-    resultaat = service.files().list(q=query, spaces="drive", fields="files(id)").execute()
-    bestanden = resultaat.get("files", [])
-    if bestanden:
-        return bestanden[0]["id"]
-    # Map aanmaken
-    meta: dict[str, Any] = {
-        "name": naam,
-        "mimeType": "application/vnd.google-apps.folder",
-    }
-    if parent_id:
-        meta["parents"] = [parent_id]
-    folder = service.files().create(body=meta, fields="id").execute()
-    return folder["id"]
-
-
-def _offerte_map_id() -> str:
-    """Geeft het id van de map 'Solvigo CRM/Offertes' op Drive."""
-    root = _zoek_of_maak_map("Solvigo CRM")
-    return _zoek_of_maak_map("Offertes", root)
-
-
-def upload_pdf(bestandsnaam: str, inhoud: bytes) -> tuple[str, str]:
+def upload_pdf(bestandsnaam: str, inhoud: bytes, offerte_id: int) -> str:
     """
-    Upload een PDF naar Google Drive.
+    Sla een PDF op in de Google Sheet als base64-chunks.
 
     Returns:
-        (drive_file_id, web_view_link)
+        bestandsnaam (ter bevestiging)
     """
-    service = _drive_service()
-    folder_id = _offerte_map_id()
+    # Eerst oude PDF verwijderen als die er was
+    verwijder_bestand(offerte_id)
 
-    meta: dict[str, Any] = {
-        "name": bestandsnaam,
-        "parents": [folder_id],
-    }
-    media = MediaIoBaseUpload(io.BytesIO(inhoud), mimetype="application/pdf", resumable=True)
-    bestand = (
-        service.files()
-        .create(body=meta, media_body=media, fields="id, webViewLink")
-        .execute()
-    )
-    file_id = bestand["id"]
-    link = bestand.get("webViewLink", f"https://drive.google.com/file/d/{file_id}/view")
+    # Base64-coderen
+    b64 = base64.b64encode(inhoud).decode("ascii")
 
-    # Maak het bestand leesbaar voor iedereen met de link.
+    # Splits in chunks van 40.000 tekens (ruim binnen de 50K cel-limiet)
+    CHUNK = 40_000
+    chunks = [b64[i:i + CHUNK] for i in range(0, len(b64), CHUNK)]
+
+    ws = _pdf_sheet()
+    rijen = []
+    for nr, chunk in enumerate(chunks):
+        rijen.append([str(offerte_id), bestandsnaam, str(nr), chunk])
+
+    # Voeg alle chunks toe in één API-call
+    ws.append_rows(rijen, value_input_option="RAW")
+
+    return bestandsnaam
+
+
+def haal_pdf_op(offerte_id: int) -> tuple[str, bytes] | None:
+    """
+    Haal een opgeslagen PDF op uit de Google Sheet.
+
+    Returns:
+        (bestandsnaam, pdf_bytes) of None als er geen PDF is.
+    """
+    ws = _pdf_sheet()
+    alle = ws.get_all_records()
+
+    chunks = []
+    bestandsnaam = ""
+    for rij in alle:
+        try:
+            if str(rij.get("offerte_id", "")) == str(offerte_id):
+                chunks.append((int(rij.get("chunk_nr", 0)), rij.get("data", "")))
+                bestandsnaam = rij.get("bestandsnaam", "offerte.pdf")
+        except (ValueError, TypeError):
+            continue
+
+    if not chunks:
+        return None
+
+    # Sorteer op chunk_nr en voeg samen
+    chunks.sort(key=lambda x: x[0])
+    b64 = "".join(c[1] for c in chunks)
+
     try:
-        service.permissions().create(
-            fileId=file_id,
-            body={"type": "anyone", "role": "reader"},
-        ).execute()
+        pdf_bytes = base64.b64decode(b64)
     except Exception:
-        pass  # Als permissie niet lukt, is de link alleen via service-account bereikbaar.
+        return None
 
-    return file_id, link
+    return bestandsnaam, pdf_bytes
 
 
-def verwijder_bestand(drive_file_id: str):
-    """Verwijder een bestand van Google Drive."""
+def verwijder_bestand(offerte_id: int):
+    """Verwijder alle chunks van een offerte-PDF."""
     try:
-        service = _drive_service()
-        service.files().delete(fileId=drive_file_id).execute()
+        ws = _pdf_sheet()
+        alle = ws.get_all_values()
+        # Verwijder rijen van achter naar voor (zodat indices niet verschuiven)
+        te_verwijderen = []
+        for idx, rij in enumerate(alle[1:], start=2):  # skip header
+            if rij and str(rij[0]) == str(offerte_id):
+                te_verwijderen.append(idx)
+
+        for idx in reversed(te_verwijderen):
+            ws.delete_rows(idx)
     except Exception:
         pass
 
 
 def drive_link(drive_file_id: str) -> str:
-    """Maak een view-link van een Drive file-id."""
-    return f"https://drive.google.com/file/d/{drive_file_id}/view"
+    """Niet meer gebruikt (was voor Drive-versie), maar behouden voor compatibiliteit."""
+    return ""
