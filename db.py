@@ -364,16 +364,6 @@ def _worksheet(tabel: str):
         ws = ss.add_worksheet(title=tabel, rows=1000, cols=max(20, len(headers)))
         werkbladen[tabel] = ws
         ws.update(values=[headers], range_name="A1")
-    else:
-        # Sync headers: voeg ontbrekende kolommen toe aan bestaande sheets.
-        try:
-            huidige_headers = ws.row_values(1)
-            ontbrekend = [h for h in headers if h not in huidige_headers]
-            if ontbrekend:
-                nieuwe_headers = huidige_headers + ontbrekend
-                ws.update(values=[nieuwe_headers], range_name="A1")
-        except Exception:
-            pass  # Bij quota-fout niet blokkeren.
 
     return ws
 
@@ -383,8 +373,12 @@ def _sheet_records_direct(tabel: str) -> list[dict]:
     headers = TABEL_KOLOMMEN[tabel]
     try:
         records = ws.get_all_records(expected_headers=headers)
-    except TypeError:
-        records = ws.get_all_records()
+    except Exception:
+        # Fallback: lees zonder expected_headers (bv. als de sheet nog oude kolommen heeft).
+        try:
+            records = ws.get_all_records()
+        except Exception:
+            return []
 
     opgeschoond: list[dict] = []
     for record in records:
@@ -392,6 +386,7 @@ def _sheet_records_direct(tabel: str) -> list[dict]:
         if not any(str(record.get(k, "")).strip() for k in headers):
             continue
         opgeschoond.append({k: record.get(k, "") for k in headers})
+    return opgeschoond
     return opgeschoond
 
 
@@ -453,12 +448,23 @@ def _volgend_id(tabel: str) -> int:
 
 def _google_init_db():
     # Maakt alle worksheets + headers aan als ze nog niet bestaan.
+    # Synchroniseert ook kolommen als de code nieuwere kolommen heeft dan de Sheet.
     # Dit gebeurt maar één keer per Streamlit-proces om API-quota te sparen.
     global _GS_INITIALIZED
     if _GS_INITIALIZED:
         return
     for tabel in TABEL_KOLOMMEN:
-        _worksheet(tabel)
+        ws = _worksheet(tabel)
+        # Sync headers: voeg ontbrekende kolommen toe aan bestaande sheets.
+        try:
+            huidige_headers = ws.row_values(1)
+            verwacht = TABEL_KOLOMMEN[tabel]
+            ontbrekend = [h for h in verwacht if h not in huidige_headers]
+            if ontbrekend:
+                nieuwe_headers = huidige_headers + ontbrekend
+                ws.update(values=[nieuwe_headers], range_name="A1")
+        except Exception:
+            pass  # Bij quota-fout niet blokkeren.
     _GS_INITIALIZED = True
 
 
